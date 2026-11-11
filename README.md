@@ -2,6 +2,11 @@
 
 API tests for the Toolshop app, written with pytest and requests.
 
+## Layout
+
+- `toolshop/` holds the API client (`ApiClient`).
+- `tests/` holds the tests and fixtures (`conftest.py`).
+
 ## Setup
 
 Requires Python 3.12 and pip 25.1 or newer.

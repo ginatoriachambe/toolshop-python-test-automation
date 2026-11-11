@@ -5,3 +5,6 @@ requires-python = ">=3.12"
 
 [dependency-groups]
 test = ["pytest==9.2.0", "requests==2.34.2"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
