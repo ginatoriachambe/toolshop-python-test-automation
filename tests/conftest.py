@@ -10,8 +10,13 @@ TEST_PASSWORD = "Xq7#mT2!vLp9"  # meets the API rules and is not in a known data
 
 
 @pytest.fixture(scope="session")
-def api_client():
-    client = ApiClient(BASE_URL)
+def base_url():
+    return BASE_URL
+
+
+@pytest.fixture(scope="session")
+def api_client(base_url):
+    client = ApiClient(base_url)
     yield client
     client.close()
 
