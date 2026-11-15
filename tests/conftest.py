@@ -38,3 +38,19 @@ def auth_token(api_client, registered_user):
     response = api_client.login(registered_user["email"], registered_user["password"])
     assert response.status_code == 200, response.text
     return response.json()["access_token"]
+
+
+@pytest.fixture
+def cart_id(api_client):
+    response = api_client.post("/carts")
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
+@pytest.fixture
+def product_id(api_client):
+    products = api_client.get("/products").json()["data"]
+    for product in products:
+        if product["in_stock"] and not product["is_rental"]:
+            return product["id"]
+    pytest.fail("No in-stock, non-rental product on the first page of /products")

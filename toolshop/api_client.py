@@ -27,6 +27,13 @@ class ApiClient:
             timeout=self.timeout,
         )
 
+    def delete(self, path, token=None):
+        return self.session.delete(
+            f"{self.base_url}{path}",
+            headers=_auth_headers(token),
+            timeout=self.timeout,
+        )
+
     def login(self, email, password):
         return self.post("/users/login", json={"email": email, "password": password})
 
