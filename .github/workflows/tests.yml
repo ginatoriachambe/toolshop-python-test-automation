@@ -34,6 +34,16 @@ jobs:
         timeout-minutes: 20
         run: $COMPOSE up -d --build
 
+      # The composer container chowns the code to its own www-data (uid 82), but PHP-FPM runs as
+      # www-data uid 1000. Re-own Laravel's writable folders inside laravel-api, after composer is done.
+      - name: Make Laravel storage writable
+        working-directory: toolshop-app
+        timeout-minutes: 5
+        run: |
+          $COMPOSE wait composer
+          $COMPOSE exec -T -u root laravel-api chown -R www-data storage bootstrap/cache
+          $COMPOSE exec -T laravel-api test -w storage/logs
+
       - name: Seed database
         working-directory: toolshop-app
         timeout-minutes: 5
