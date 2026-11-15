@@ -4,7 +4,12 @@ version = "0.1.0"
 requires-python = ">=3.12"
 
 [dependency-groups]
-test = ["pytest==9.2.0", "requests==2.34.2"]
+test = [
+    "pytest==9.2.0",
+    "requests==2.34.2",
+    "playwright==1.65.2",
+    "pytest-playwright==0.10.0",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

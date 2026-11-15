@@ -8,8 +8,8 @@ from toolshop.api_client import ApiClient
 THREADS = 10
 
 
-def add_one(base_url, cart_id, product_id, barrier):
-    client = ApiClient(base_url)  # each thread owns its own session
+def add_one(api_base_url, cart_id, product_id, barrier):
+    client = ApiClient(api_base_url)  # each thread owns its own session
     try:
         barrier.wait(timeout=10)  # release all threads at the same moment
         response = client.post(f"/carts/{cart_id}", json={"product_id": product_id, "quantity": 1})
@@ -19,10 +19,10 @@ def add_one(base_url, cart_id, product_id, barrier):
 
 
 @pytest.mark.parametrize("run", range(5))
-def test_parallel_adds_to_same_cart_keep_every_quantity(run, api_client, base_url, cart_id, product_id):
+def test_parallel_adds_to_same_cart_keep_every_quantity(run, api_client, api_base_url, cart_id, product_id):
     barrier = threading.Barrier(THREADS)
     with ThreadPoolExecutor(max_workers=THREADS) as pool:
-        futures = [pool.submit(add_one, base_url, cart_id, product_id, barrier) for _ in range(THREADS)]
+        futures = [pool.submit(add_one, api_base_url, cart_id, product_id, barrier) for _ in range(THREADS)]
         statuses = [future.result() for future in futures]
 
     assert statuses == [200] * THREADS
