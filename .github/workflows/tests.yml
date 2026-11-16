@@ -38,8 +38,8 @@ jobs:
 
       - name: Run tests
         timeout-minutes: 10
-        # 4 workers: the runner has 4 vCPUs (shared with Toolshop) and Toolshop's PHP-FPM serves at most 5 requests at once.
-        run: pytest tests -n 4 -v -rxX --junitxml=reports/junit.xml
+        # Sequential on purpose: see docs/metrics/parallel.md.
+        run: pytest tests -v -rxX --junitxml=reports/junit.xml
 
       - name: Upload JUnit report
         if: always()
