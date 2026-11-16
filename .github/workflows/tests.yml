@@ -11,8 +11,6 @@ permissions:
 env:
   # Toolshop commit to test against (testsmith-io/practice-software-testing).
   TOOLSHOP_COMMIT: ae7caecb811dd8952c09d997e69be7cb946ecd44
-  # Only the base file: skips the override (phpmyadmin, cron, mailcatcher and the dev nginx config).
-  COMPOSE: docker compose -f docker-compose.yml
 
 jobs:
   test:
@@ -22,40 +20,10 @@ jobs:
       - name: Check out tests
         uses: actions/checkout@v7
 
-      - name: Check out Toolshop at fixed commit
-        uses: actions/checkout@v7
-        with:
-          repository: testsmith-io/practice-software-testing
-          ref: ${{ env.TOOLSHOP_COMMIT }}
-          path: toolshop-app
-
       - name: Start Toolshop
-        working-directory: toolshop-app
-        timeout-minutes: 20
-        run: $COMPOSE up -d --build
-
-      # The composer container chowns the code to its own www-data (uid 82), but PHP-FPM runs as
-      # www-data uid 1000. Re-own Laravel's writable folders inside laravel-api, after composer is done.
-      - name: Make Laravel storage writable
-        working-directory: toolshop-app
-        timeout-minutes: 5
-        run: |
-          $COMPOSE wait composer
-          $COMPOSE exec -T -u root laravel-api chown -R www-data storage bootstrap/cache
-          $COMPOSE exec -T laravel-api test -w storage/logs
-
-      - name: Seed database
-        working-directory: toolshop-app
-        timeout-minutes: 5
-        run: until $COMPOSE exec -T laravel-api php artisan migrate:fresh --seed --force; do sleep 5; done
-
-      - name: Wait for API
-        timeout-minutes: 5
-        run: until curl -fsS -o /dev/null http://localhost:8091/products; do sleep 5; done
-
-      - name: Wait for UI
-        timeout-minutes: 5
-        run: until curl -fsS -o /dev/null http://localhost:4200/main.js; do sleep 5; done
+        uses: ./.github/actions/start-toolshop
+        with:
+          commit: ${{ env.TOOLSHOP_COMMIT }}
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -79,23 +47,6 @@ jobs:
           name: junit-report
           path: reports/junit.xml
 
-      - name: Save container logs
+      - name: Save Toolshop logs
         if: failure()
-        working-directory: toolshop-app
-        run: |
-          $COMPOSE ps -a > ../compose-logs.txt
-          $COMPOSE logs --no-color --timestamps >> ../compose-logs.txt
-          # API diagnostics: container logs only show status codes, not why a request failed.
-          # The response body shows what the API returned; Laravel writes its errors to laravel.log,
-          # a file that never appears in container logs. Each line tolerates failure so the rest still run.
-          {
-            echo "== response body";          curl -s -i http://localhost:8091/products | head -20 || true
-            echo "== laravel.log (tail)";     tail -50 sprint5/API/storage/logs/laravel.log || echo "no laravel.log"
-          } >> ../compose-logs.txt 2>&1
-
-      - name: Upload container logs
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: docker-logs
-          path: compose-logs.txt
+        uses: ./.github/actions/save-toolshop-logs

@@ -1,0 +1,48 @@
+name: Start Toolshop
+description: Check out Toolshop at a fixed commit, start it with Docker Compose, seed it, and wait until API and UI respond.
+
+inputs:
+  commit:
+    description: Toolshop commit to test against (testsmith-io/practice-software-testing)
+    required: true
+
+# Every compose command uses only the base file (-f docker-compose.yml): that skips the override
+# (phpmyadmin, cron, mailcatcher and the dev nginx config).
+# Composite steps don't support timeout-minutes, so each limit is a `timeout` in the command itself.
+runs:
+  using: composite
+  steps:
+    - name: Check out Toolshop at fixed commit
+      uses: actions/checkout@v7
+      with:
+        repository: testsmith-io/practice-software-testing
+        ref: ${{ inputs.commit }}
+        path: toolshop-app
+
+    - name: Start Toolshop
+      shell: bash
+      working-directory: toolshop-app
+      run: timeout 20m docker compose -f docker-compose.yml up -d --build
+
+    # The composer container chowns the code to its own www-data (uid 82), but PHP-FPM runs as
+    # www-data uid 1000. Re-own Laravel's writable folders inside laravel-api, after composer is done.
+    - name: Make Laravel storage writable
+      shell: bash
+      working-directory: toolshop-app
+      run: |
+        timeout 5m docker compose -f docker-compose.yml wait composer
+        docker compose -f docker-compose.yml exec -T -u root laravel-api chown -R www-data storage bootstrap/cache
+        docker compose -f docker-compose.yml exec -T laravel-api test -w storage/logs
+
+    - name: Seed database
+      shell: bash
+      working-directory: toolshop-app
+      run: timeout 5m bash -c 'until docker compose -f docker-compose.yml exec -T laravel-api php artisan migrate:fresh --seed --force; do sleep 5; done'
+
+    - name: Wait for API
+      shell: bash
+      run: timeout 5m bash -c 'until curl -fsS -o /dev/null http://localhost:8091/products; do sleep 5; done'
+
+    - name: Wait for UI
+      shell: bash
+      run: timeout 5m bash -c 'until curl -fsS -o /dev/null http://localhost:4200/main.js; do sleep 5; done'

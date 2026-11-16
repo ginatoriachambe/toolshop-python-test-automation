@@ -1,0 +1,29 @@
+name: Save Toolshop logs
+description: "Save container status, container logs and API diagnostics, and upload them as the docker-logs artifact. Call it with `if: failure()`."
+
+# `if: always()` on both steps: they should run whenever this action is called, even if an earlier
+# step of the job failed (that is exactly when it's called).
+runs:
+  using: composite
+  steps:
+    - name: Save container logs
+      if: always()
+      shell: bash
+      working-directory: toolshop-app
+      run: |
+        docker compose -f docker-compose.yml ps -a > ../compose-logs.txt
+        docker compose -f docker-compose.yml logs --no-color --timestamps >> ../compose-logs.txt
+        # API diagnostics: container logs only show status codes, not why a request failed.
+        # The response body shows what the API returned; Laravel writes its errors to laravel.log,
+        # a file that never appears in container logs. Each line tolerates failure so the rest still run.
+        {
+          echo "== response body";          curl -s -i http://localhost:8091/products | head -20 || true
+          echo "== laravel.log (tail)";     tail -50 sprint5/API/storage/logs/laravel.log || echo "no laravel.log"
+        } >> ../compose-logs.txt 2>&1
+
+    - name: Upload container logs
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: docker-logs
+        path: compose-logs.txt
