@@ -1,0 +1,75 @@
+name: Reliability baseline
+
+# Manual only: starts Toolshop once, runs the whole suite N times against it, and summarises
+# outcomes and durations per test. It measures; it doesn't gate, so failing runs don't fail the job.
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: How many times to run the suite
+        type: number
+        default: 20
+
+permissions:
+  contents: read
+
+env:
+  # Keep in sync with tests.yml, so the baseline measures the same Toolshop as the PR checks.
+  TOOLSHOP_COMMIT: ae7caecb811dd8952c09d997e69be7cb946ecd44
+
+jobs:
+  baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out tests
+        uses: actions/checkout@v7
+
+      - name: Start Toolshop
+        uses: ./.github/actions/start-toolshop
+        with:
+          commit: ${{ env.TOOLSHOP_COMMIT }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies and Chromium
+        run: |
+          python -m pip install pip==26.2.2
+          pip install --group test
+          playwright install --with-deps chromium
+
+      # `|| echo` makes a failing run non-fatal (the shell runs with -e), so the loop always finishes.
+      # `timeout 5m` stops a hung run without using up the whole step.
+      # The input arrives via env, not ${{ }} inside the script, so it can't inject shell code.
+      - name: Run suite N times
+        id: suite
+        timeout-minutes: 60
+        env:
+          RUNS: ${{ inputs.runs }}
+        run: |
+          for i in $(seq 1 "$RUNS"); do
+            echo "::group::Run $i of $RUNS"
+            timeout 5m pytest tests -q --junitxml="reports/run-$(printf '%02d' "$i").xml" \
+              || echo "::warning::Run $i did not pass (exit code $?)"
+            echo "::endgroup::"
+          done
+
+      - name: Summarise
+        if: always() && steps.suite.outcome != 'skipped'
+        run: |
+          python scripts/junit_summary.py reports/run-*.xml > reports/summary.md
+          cat reports/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload reports and summary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reliability-reports
+          path: reports/
+
+      - name: Save Toolshop logs
+        if: failure()
+        uses: ./.github/actions/save-toolshop-logs
