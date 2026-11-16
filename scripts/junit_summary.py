@@ -7,7 +7,7 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
-from statistics import mean
+from statistics import mean, median
 
 # Most severe last: when one test has two <testcase> elements in a report
 # (failure in the test body + error in teardown), the most severe one wins.
@@ -47,6 +47,11 @@ def read_report(path):
     return results
 
 
+def suite_time(path):
+    """Wall time of one pytest run, as pytest reports it (also correct with xdist workers)."""
+    return sum(float(suite.get("time", 0)) for suite in ET.parse(path).getroot().iter("testsuite"))
+
+
 def main(paths):
     if not paths:
         sys.exit("usage: junit_summary.py REPORT.xml [REPORT.xml ...]")
@@ -72,6 +77,8 @@ def main(paths):
     print(f"## Reliability summary: {len(paths)} runs\n")
     print(f"{len(tests)} tests · {len(flaky)} flaky · {len(always_failing)} always failing"
           f" · {len(known_bugs)} with known-bug xfails\n")
+    times = [suite_time(path) for path in paths]
+    print(f"Suite time per run: median {median(times):.2f} s (min {min(times):.2f} s, max {max(times):.2f} s)\n")
 
     for title, group in [("Flaky (passed and failed across runs)", flaky),
                          ("Always failing", always_failing)]:
