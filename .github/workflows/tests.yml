@@ -85,12 +85,11 @@ jobs:
         run: |
           $COMPOSE ps -a > ../compose-logs.txt
           $COMPOSE logs --no-color --timestamps >> ../compose-logs.txt
-          # Diagnostics for the API 500 (temporary). Each line tolerates failure so the rest still run.
+          # API diagnostics: container logs only show status codes, not why a request failed.
+          # The response body shows what the API returned; Laravel writes its errors to laravel.log,
+          # a file that never appears in container logs. Each line tolerates failure so the rest still run.
           {
             echo "== response body";          curl -s -i http://localhost:8091/products | head -20 || true
-            echo "== php-fpm user";           $COMPOSE exec -T laravel-api id || true
-            echo "== composer www-data user"; $COMPOSE run --rm --no-deps --entrypoint id composer www-data || true
-            echo "== storage ownership";      ls -ln sprint5/API/storage sprint5/API/storage/logs sprint5/API/storage/framework || true
             echo "== laravel.log (tail)";     tail -50 sprint5/API/storage/logs/laravel.log || echo "no laravel.log"
           } >> ../compose-logs.txt 2>&1
 
