@@ -9,6 +9,7 @@ test = [
     "requests==2.34.2",
     "playwright==1.65.2",
     "pytest-playwright==0.10.0",
+    "pytest-xdist==3.8.0",
 ]
 
 [tool.pytest.ini_options]

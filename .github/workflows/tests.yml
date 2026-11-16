@@ -38,6 +38,7 @@ jobs:
 
       - name: Run tests
         timeout-minutes: 10
+        # Sequential on purpose: see docs/metrics/parallel.md.
         run: pytest tests -v -rxX --junitxml=reports/junit.xml
 
       - name: Upload JUnit report

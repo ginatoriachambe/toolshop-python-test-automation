@@ -9,6 +9,11 @@ on:
         description: How many times to run the suite
         type: number
         default: 20
+      mode:
+        description: "sequential, or parallel (pytest-xdist, 4 workers)"
+        type: choice
+        options: [sequential, parallel]
+        default: sequential
 
 permissions:
   contents: read
@@ -47,20 +52,27 @@ jobs:
       - name: Run suite N times
         id: suite
         timeout-minutes: 60
+        # -n 0 runs without xdist workers, exactly like before xdist was added.
         env:
           RUNS: ${{ inputs.runs }}
+          MODE: ${{ inputs.mode }}
         run: |
+          if [ "$MODE" = "parallel" ]; then WORKERS=4; else WORKERS=0; fi
           for i in $(seq 1 "$RUNS"); do
-            echo "::group::Run $i of $RUNS"
-            timeout 5m pytest tests -q --junitxml="reports/run-$(printf '%02d' "$i").xml" \
+            echo "::group::Run $i of $RUNS ($MODE)"
+            timeout 5m pytest tests -q -n "$WORKERS" --junitxml="reports/run-$(printf '%02d' "$i").xml" \
               || echo "::warning::Run $i did not pass (exit code $?)"
             echo "::endgroup::"
           done
 
       - name: Summarise
         if: always() && steps.suite.outcome != 'skipped'
+        env:
+          MODE: ${{ inputs.mode }}
         run: |
-          python scripts/junit_summary.py reports/run-*.xml > reports/summary.md
+          echo "Mode: $MODE" > reports/summary.md
+          echo >> reports/summary.md
+          python scripts/junit_summary.py reports/run-*.xml >> reports/summary.md
           cat reports/summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload reports and summary
